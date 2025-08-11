@@ -261,12 +261,6 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 MIT License - see [LICENSE](LICENSE) for details.
 
-## Support
-
-- Documentation: https://docs.uir-framework.io
-- Issues: https://github.com/uir-framework/uir/issues
-- Discord: https://discord.gg/uir-framework
-
 ## Roadmap
 
 - [ ] Additional provider integrations
