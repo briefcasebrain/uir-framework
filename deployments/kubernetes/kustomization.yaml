@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment.yaml
+  - service.yaml
+  - configmap.yaml
+
+namespace: uir
+
+commonLabels:
+  app: uir-framework
+  version: v1.0.0
+
+images:
+  - name: uir-framework
+    newName: ghcr.io/briefcasebrain/uir-framework
+    newTag: latest

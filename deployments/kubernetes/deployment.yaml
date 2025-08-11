@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: uir-api
+  labels:
+    app: uir-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: uir-api
+  template:
+    metadata:
+      labels:
+        app: uir-api
+    spec:
+      containers:
+      - name: uir-framework
+        image: uir-framework:latest
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: UIR_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: uir-secrets
+              key: api-key
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: uir-config
+              key: redis-url
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: uir-secrets
+              key: database-url
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
