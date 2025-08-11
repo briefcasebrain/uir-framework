@@ -353,30 +353,15 @@ See [SECURITY.md](SECURITY.md) for information on:
 
 ## Roadmap
 
-### Q1 2025
+### 2025
 - [x] Core framework implementation
 - [x] Basic provider support (Google, Pinecone, Elasticsearch)
 - [x] Authentication and rate limiting
 - [ ] Additional provider integrations
 
-### Q2 2025
-- [ ] GraphQL API support
-- [ ] Real-time streaming results
-- [ ] Advanced caching strategies
-
-### Q3 2025
-- [ ] ML-based query understanding
-- [ ] Multi-modal search (images, audio)
-- [ ] Federated learning for result ranking
-
-### Future
-- [ ] Natural language to structured query
-- [ ] Cross-provider query optimization
-- [ ] AutoML for ranking models
-
 ## Project Status
 
-**Current Version**: 1.0.0 (January 2025)
+**Current Version**: 1.0.0 (August 2025)
 
 This project is actively maintained and in production use. We follow semantic versioning and maintain backward compatibility within major versions.
 
@@ -387,11 +372,3 @@ This project is actively maintained and in production use. We follow semantic ve
 - **Discussions**: [GitHub Discussions](https://github.com/briefcasebrain/uir-framework/discussions)
 - **Security**: [Security Policy](SECURITY.md)
 - **Contributing**: [Contribution Guidelines](CONTRIBUTING.md)
-
-## Authors
-
-Developed and maintained by the BriefcaseBrain team.
-
-## Acknowledgments
-
-Special thanks to all contributors and the open-source community for their valuable feedback and contributions.
