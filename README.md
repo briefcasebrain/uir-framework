@@ -5,6 +5,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Version](https://img.shields.io/badge/version-1.0.0-green)](https://pypi.org/project/uir-framework/)
+[![CI](https://github.com/briefcasebrain/uir-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/briefcasebrain/uir-framework/actions/workflows/ci.yml)
 [![Documentation](https://img.shields.io/badge/docs-available-brightgreen)](docs/)
 
 A unified, scalable framework for information retrieval across multiple providers, supporting search engines, vector databases, document stores, and hybrid search capabilities.
@@ -19,7 +20,8 @@ A unified, scalable framework for information retrieval across multiple provider
 - **Query Intelligence**: Advanced query processing with spell correction, entity extraction, and intent classification
 - **Result Fusion**: Smart aggregation with reciprocal rank fusion and weighted scoring
 - **High Performance**: Async architecture with circuit breakers, rate limiting, and intelligent caching
-- **Enterprise Ready**: JWT authentication, RBAC, usage tracking, and comprehensive monitoring
+- **Enterprise Ready**: JWT authentication, RBAC, API key management, usage tracking, and comprehensive monitoring
+- **Production Ready**: Comprehensive test suite, CI/CD pipelines, Docker support, and Kubernetes deployments
 
 ### Search Types
 - **Keyword Search**: Traditional text-based search across web engines and document stores
@@ -176,7 +178,7 @@ docker-compose up
 ### Using Kubernetes
 
 ```bash
-kubectl apply -f deployments/kubernetes.yaml
+kubectl apply -f deployments/kubernetes/
 ```
 
 ### Development Mode
@@ -250,13 +252,16 @@ client = UIR(
 
 ## Architecture
 
-The UIR framework follows a layered architecture:
+The UIR framework follows a modular, layered architecture:
 
-1. **Client Layer**: SDKs for Python, JavaScript, Go
-2. **API Gateway**: Authentication, rate limiting, routing
-3. **Core Services**: Query processing, provider management, result aggregation
-4. **Provider Adapters**: Unified interface for diverse providers
-5. **Storage Layer**: Caching, metadata, audit logs
+1. **Client Layer**: SDKs for Python (JavaScript and Go coming soon)
+2. **API Gateway**: Authentication, rate limiting, request routing
+3. **Core Services**: 
+   - Query processing with NLP enhancements
+   - Provider management with health monitoring
+   - Result aggregation and ranking
+4. **Provider Adapters**: Unified interface for diverse providers with circuit breakers
+5. **Storage Layer**: Redis caching, PostgreSQL metadata, audit logging
 
 ## Performance
 
@@ -286,7 +291,13 @@ MIT License - see [LICENSE](LICENSE) for details.
 Run the test suite:
 
 ```bash
-# Run all tests
+# Run mock tests (no external dependencies required)
+python scripts/test_with_mocks.py
+
+# Run with coverage and JUnit reports
+python scripts/test_with_mocks.py --coverage --junit
+
+# Run pytest tests
 pytest
 
 # Run with coverage
@@ -294,6 +305,9 @@ pytest --cov=uir tests/
 
 # Run specific test modules
 pytest tests/test_client.py
+
+# Run integration tests
+pytest tests/test_integration/
 
 # Run performance tests
 pytest tests/performance/
@@ -329,17 +343,55 @@ flake8 src/ tests/
 mypy src/
 ```
 
+## Security
+
+See [SECURITY.md](SECURITY.md) for information on:
+- Reporting vulnerabilities
+- Security best practices
+- Built-in security features
+- Compliance support (GDPR, CCPA, SOC 2, HIPAA)
+
 ## Roadmap
 
+### Q1 2025
+- [x] Core framework implementation
+- [x] Basic provider support (Google, Pinecone, Elasticsearch)
+- [x] Authentication and rate limiting
 - [ ] Additional provider integrations
+
+### Q2 2025
 - [ ] GraphQL API support
 - [ ] Real-time streaming results
+- [ ] Advanced caching strategies
+
+### Q3 2025
 - [ ] ML-based query understanding
 - [ ] Multi-modal search (images, audio)
 - [ ] Federated learning for result ranking
+
+### Future
+- [ ] Natural language to structured query
+- [ ] Cross-provider query optimization
+- [ ] AutoML for ranking models
+
+## Project Status
+
+**Current Version**: 1.0.0 (January 2025)
+
+This project is actively maintained and in production use. We follow semantic versioning and maintain backward compatibility within major versions.
 
 ## Support
 
 - **Documentation**: [Full documentation](docs/)
 - **Issues**: [GitHub Issues](https://github.com/briefcasebrain/uir-framework/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/briefcasebrain/uir-framework/discussions)
+- **Security**: [Security Policy](SECURITY.md)
+- **Contributing**: [Contribution Guidelines](CONTRIBUTING.md)
+
+## Authors
+
+Developed and maintained by the BriefcaseBrain team.
+
+## Acknowledgments
+
+Special thanks to all contributors and the open-source community for their valuable feedback and contributions.
