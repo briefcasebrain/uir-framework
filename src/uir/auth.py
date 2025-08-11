@@ -121,7 +121,7 @@ class AuthManager:
     
     def _hash_api_key(self, api_key: str) -> str:
         """Hash API key for storage"""
-        return hashlib.sha256(api_key.encode()).hexdigest()
+        return self.pwd_context.hash(api_key)
     
     def create_user(
         self,
