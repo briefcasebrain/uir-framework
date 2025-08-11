@@ -130,8 +130,8 @@ class AuthManager:
         return key_data.get("rate_limit")
     
     def _hash_api_key(self, api_key: str) -> str:
-        """Hash API key for storage using SHA256 for consistent hashing"""
-        return hashlib.sha256(api_key.encode()).hexdigest()
+        """Hash API key for storage using a secure password hashing algorithm (bcrypt)"""
+        return self.pwd_context.hash(api_key)
     
     def create_user(
         self,
