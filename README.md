@@ -1,8 +1,17 @@
 # Universal Information Retrieval (UIR) Framework
 
+<div align="center">
+
+[![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Version](https://img.shields.io/badge/version-1.0.0-green)](https://pypi.org/project/uir-framework/)
+[![Documentation](https://img.shields.io/badge/docs-available-brightgreen)](docs/)
+
 A unified, scalable framework for information retrieval across multiple providers, supporting search engines, vector databases, document stores, and hybrid search capabilities.
 
-## 🌟 Features
+</div>
+
+## Features
 
 ### Core Capabilities
 - **Multi-Provider Support**: Integrate with 50+ search providers (Google, Bing, Elasticsearch, Pinecone, etc.)
@@ -20,14 +29,25 @@ A unified, scalable framework for information retrieval across multiple provider
 
 ## Installation
 
+### Using pip
+
 ```bash
+# Basic installation
 pip install uir-framework
+
+# With specific providers
+pip install uir-framework[google,pinecone,elasticsearch]
+
+# Full installation with all providers
+pip install uir-framework[all]
 ```
 
-Or install with specific providers:
+### From source
 
 ```bash
-pip install uir-framework[google,pinecone,elasticsearch]
+git clone https://github.com/briefcasebrain/uir-framework.git
+cd uir-framework
+pip install -e .
 ```
 
 ## Quick Start
@@ -261,6 +281,54 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 MIT License - see [LICENSE](LICENSE) for details.
 
+## Testing
+
+Run the test suite:
+
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=uir tests/
+
+# Run specific test modules
+pytest tests/test_client.py
+
+# Run performance tests
+pytest tests/performance/
+```
+
+## Development
+
+### Setting up development environment
+
+```bash
+# Clone the repository
+git clone https://github.com/briefcasebrain/uir-framework.git
+cd uir-framework
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install development dependencies
+pip install -e ".[dev]"
+```
+
+### Code quality
+
+```bash
+# Format code
+black src/ tests/
+
+# Lint code
+flake8 src/ tests/
+
+# Type checking
+mypy src/
+```
+
 ## Roadmap
 
 - [ ] Additional provider integrations
@@ -269,3 +337,9 @@ MIT License - see [LICENSE](LICENSE) for details.
 - [ ] ML-based query understanding
 - [ ] Multi-modal search (images, audio)
 - [ ] Federated learning for result ranking
+
+## Support
+
+- **Documentation**: [Full documentation](docs/)
+- **Issues**: [GitHub Issues](https://github.com/briefcasebrain/uir-framework/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/briefcasebrain/uir-framework/discussions)
