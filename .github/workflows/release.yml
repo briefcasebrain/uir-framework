@@ -1,0 +1,304 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+jobs:
+  validate-tag:
+    name: Validate Release Tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_prerelease: ${{ steps.version.outputs.is_prerelease }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate version tag
+        id: version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          
+          # Remove 'v' prefix
+          VERSION=${TAG#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Check if pre-release (contains alpha, beta, rc)
+          if [[ $VERSION =~ (alpha|beta|rc) ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # Validate semantic version format
+          if ! [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?(\.[0-9]+)?$ ]]; then
+            echo "Invalid version format: $VERSION"
+            exit 1
+          fi
+
+      - name: Check version consistency
+        run: |
+          PACKAGE_VERSION=$(python -c "import sys; sys.path.insert(0, 'src'); import uir; print(uir.__version__)")
+          if [ "${{ steps.version.outputs.version }}" != "$PACKAGE_VERSION" ]; then
+            echo "Version mismatch: tag=${{ steps.version.outputs.version }}, package=$PACKAGE_VERSION"
+            exit 1
+          fi
+
+  build-release:
+    name: Build Release Assets
+    runs-on: ubuntu-latest
+    needs: validate-tag
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine wheel
+
+      - name: Build source distribution and wheel
+        run: python -m build
+
+      - name: Verify build
+        run: |
+          python -m twine check dist/*
+          ls -la dist/
+
+      - name: Create release archive
+        run: |
+          tar -czf uir-framework-${{ needs.validate-tag.outputs.version }}.tar.gz \
+            --exclude='.git*' \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            --exclude='htmlcov' \
+            --exclude='.coverage' \
+            --exclude='.pytest_cache' \
+            --exclude='dist' \
+            --exclude='build' \
+            .
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-assets
+          path: |
+            dist/
+            uir-framework-${{ needs.validate-tag.outputs.version }}.tar.gz
+
+  docker-release:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    needs: validate-tag
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}
+            uirframework/uir-framework
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ needs.validate-tag.outputs.version }}
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate-tag, build-release, docker-release]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download release assets
+        uses: actions/download-artifact@v3
+        with:
+          name: release-assets
+          path: release-assets/
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Extract changelog for this version
+          if [ -f CHANGELOG.md ]; then
+            # Get changelog between current and previous tag
+            PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^)
+            echo "## Changes since $PREVIOUS_TAG" > release-notes.md
+            echo "" >> release-notes.md
+            git log --pretty=format:"- %s ([%h](https://github.com/${{ github.repository }}/commit/%H))" $PREVIOUS_TAG..HEAD >> release-notes.md
+          else
+            echo "Release ${{ needs.validate-tag.outputs.version }}" > release-notes.md
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: UIR Framework ${{ needs.validate-tag.outputs.version }}
+          body_path: release-notes.md
+          prerelease: ${{ needs.validate-tag.outputs.is_prerelease }}
+          files: |
+            release-assets/dist/*
+            release-assets/*.tar.gz
+          generate_release_notes: true
+
+  publish-pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: [validate-tag, create-release]
+    if: needs.validate-tag.outputs.is_prerelease == 'false'
+    environment:
+      name: pypi
+      url: https://pypi.org/project/uir-framework/
+
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v3
+        with:
+          name: release-assets
+          path: release-assets/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages-dir: release-assets/dist/
+
+  publish-test-pypi:
+    name: Publish to Test PyPI
+    runs-on: ubuntu-latest
+    needs: [validate-tag, create-release]
+    if: needs.validate-tag.outputs.is_prerelease == 'true'
+    environment:
+      name: test-pypi
+      url: https://test.pypi.org/project/uir-framework/
+
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v3
+        with:
+          name: release-assets
+          path: release-assets/
+
+      - name: Publish to Test PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: release-assets/dist/
+
+  update-version:
+    name: Update Version for Next Development
+    runs-on: ubuntu-latest
+    needs: [validate-tag, publish-pypi]
+    if: needs.validate-tag.outputs.is_prerelease == 'false' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: develop
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Bump version for development
+        run: |
+          # Parse current version and increment patch for dev
+          CURRENT_VERSION="${{ needs.validate-tag.outputs.version }}"
+          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+          MAJOR=${VERSION_PARTS[0]}
+          MINOR=${VERSION_PARTS[1]}
+          PATCH=${VERSION_PARTS[2]}
+          
+          # Increment patch version and add dev suffix
+          NEW_PATCH=$((PATCH + 1))
+          DEV_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}-dev"
+          
+          # Update version file
+          sed -i "s/__version__ = \".*\"/__version__ = \"$DEV_VERSION\"/" src/uir/_version.py
+          sed -i "s/__version_info__ = .*/__version_info__ = ($MAJOR, $MINOR, $NEW_PATCH)/" src/uir/_version.py
+
+      - name: Commit version bump
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add src/uir/_version.py
+          git commit -m "Bump version for development [skip ci]"
+          git push origin develop
+
+  notify-success:
+    name: Notify Release Success
+    runs-on: ubuntu-latest
+    needs: [validate-tag, create-release, publish-pypi]
+    if: always() && (needs.publish-pypi.result == 'success' || needs.publish-test-pypi.result == 'success')
+    steps:
+      - name: Notify Slack
+        uses: 8398a7/action-slack@v3
+        with:
+          status: 'success'
+          channel: '#releases'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          text: |
+            🎉 UIR Framework ${{ needs.validate-tag.outputs.version }} has been released!
+            
+            📦 Package: https://pypi.org/project/uir-framework/${{ needs.validate-tag.outputs.version }}/
+            🐳 Docker: ghcr.io/${{ github.repository }}:${{ needs.validate-tag.outputs.version }}
+            📋 Release Notes: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.ref_name }}
+
+      - name: Create Twitter announcement
+        if: needs.validate-tag.outputs.is_prerelease == 'false'
+        run: |
+          # This would integrate with Twitter API to announce major releases
+          echo "Major release ${{ needs.validate-tag.outputs.version }} completed!"

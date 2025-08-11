@@ -1,0 +1,131 @@
+name: Performance Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run performance tests daily at 3 AM UTC
+    - cron: '0 3 * * *'
+
+jobs:
+  benchmark:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest-benchmark locust memory-profiler
+
+      - name: Install package
+        run: pip install -e .
+
+      - name: Run microbenchmarks
+        run: |
+          pytest tests/test_performance/ --benchmark-only --benchmark-json=benchmark.json
+
+      - name: Store benchmark results
+        uses: benchmark-action/github-action-benchmark@v1
+        if: github.ref == 'refs/heads/main'
+        with:
+          tool: 'pytest'
+          output-file-path: benchmark.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          comment-on-alert: true
+          alert-threshold: '150%'
+          fail-on-alert: true
+
+      - name: Memory profiling
+        run: |
+          python -m memory_profiler scripts/test_with_mocks.py > memory_profile.txt
+          cat memory_profile.txt
+
+      - name: Load testing with Locust
+        run: |
+          # Start the API server in background
+          python -m uvicorn src.uir.api.main:app --host 0.0.0.0 --port 8000 &
+          API_PID=$!
+          
+          # Wait for server to start
+          sleep 10
+          
+          # Run load test
+          locust -f tests/locustfile.py --host=http://localhost:8000 --users=50 --spawn-rate=5 --run-time=60s --headless --html=load_test_report.html
+          
+          # Stop API server
+          kill $API_PID
+
+      - name: Upload performance reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-reports
+          path: |
+            benchmark.json
+            memory_profile.txt
+            load_test_report.html
+
+  stress-test:
+    name: Stress Testing
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install locust
+
+      - name: Install package
+        run: pip install -e .
+
+      - name: Extended stress test
+        run: |
+          # Start the API server
+          python -m uvicorn src.uir.api.main:app --host 0.0.0.0 --port 8000 &
+          API_PID=$!
+          
+          # Wait for server to start
+          sleep 10
+          
+          # Run extended load test
+          locust -f tests/stress_test.py --host=http://localhost:8000 --users=200 --spawn-rate=10 --run-time=600s --headless --html=stress_test_report.html
+          
+          # Stop API server
+          kill $API_PID
+
+      - name: Upload stress test report
+        uses: actions/upload-artifact@v3
+        with:
+          name: stress-test-report
+          path: stress_test_report.html

@@ -1,0 +1,183 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "uir-framework"
+dynamic = ["version"]
+description = "Universal Information Retrieval Framework - Unified interface for multiple retrieval providers"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "UIR Framework Team", email = "team@uir-framework.io"}
+]
+maintainers = [
+    {name = "UIR Framework Team", email = "maintainers@uir-framework.io"}
+]
+keywords = ["information-retrieval", "search", "vector-database", "rag", "unified-api"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic>=2.0.0",
+    "httpx>=0.25.0",
+    "redis>=5.0.0",
+    "asyncio>=3.4.3",
+    "numpy>=1.24.0",
+    "aiofiles>=23.0.0",
+    "python-multipart>=0.0.6",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "python-dotenv>=1.0.0",
+    "tenacity>=8.2.0",
+    "orjson>=3.9.0",
+    "prometheus-client>=0.19.0",
+    "opentelemetry-api>=1.21.0",
+    "opentelemetry-sdk>=1.21.0",
+    "structlog>=23.2.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.5.0",
+    "ruff>=0.1.0",
+    "pre-commit>=3.5.0"
+]
+
+google = [
+    "google-api-python-client>=2.100.0"
+]
+
+pinecone = [
+    "pinecone-client>=2.2.0"
+]
+
+elasticsearch = [
+    "elasticsearch>=8.10.0"
+]
+
+openai = [
+    "openai>=1.0.0"
+]
+
+weaviate = [
+    "weaviate-client>=3.24.0"
+]
+
+all = [
+    "uir-framework[dev,google,pinecone,elasticsearch,openai,weaviate]"
+]
+
+[project.urls]
+Homepage = "https://github.com/uir-framework/uir"
+Documentation = "https://docs.uir-framework.io"
+Repository = "https://github.com/uir-framework/uir"
+Issues = "https://github.com/uir-framework/uir/issues"
+Changelog = "https://github.com/uir-framework/uir/blob/main/CHANGELOG.md"
+
+[project.scripts]
+uir-server = "uir.api.main:main"
+
+[project.entry-points."uir.providers"]
+google = "uir.providers.google:GoogleAdapter"
+pinecone = "uir.providers.pinecone:PineconeAdapter"
+elasticsearch = "uir.providers.elasticsearch:ElasticsearchAdapter"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "uir._version.__version__"}
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311']
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = [
+    "--cov=src",
+    "--cov-report=html",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+    "--tb=short"
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests"
+]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/conftest.py",
+    "*/mocks/*"
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod"
+]
+
+[tool.ruff]
+target-version = "py38"
+line-length = 100
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "C",  # flake8-comprehensions
+    "B",  # flake8-bugbear
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501",  # line too long, handled by black
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+]
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/*" = ["F401", "F811"]

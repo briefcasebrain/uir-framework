@@ -1,0 +1,16 @@
+include README.md
+include LICENSE
+include CHANGELOG.md
+include CONTRIBUTING.md
+include requirements.txt
+include pytest.ini
+recursive-include src/uir *.py
+recursive-include tests *.py
+recursive-include config *.yaml *.yml *.json
+recursive-include docs *.md
+recursive-include deployments *.yaml *.yml
+include docker-compose.yml
+include Dockerfile
+global-exclude __pycache__
+global-exclude *.py[co]
+global-exclude .DS_Store

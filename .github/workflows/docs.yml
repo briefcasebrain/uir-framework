@@ -1,0 +1,186 @@
+name: Documentation
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'docs/**'
+      - 'src/**/*.py'
+      - 'README.md'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'docs/**'
+      - 'src/**/*.py'
+      - 'README.md'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  lint-docs:
+    name: Lint Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install markdownlint
+        run: npm install -g markdownlint-cli
+
+      - name: Lint Markdown files
+        run: |
+          markdownlint docs/**/*.md README.md CONTRIBUTING.md CHANGELOG.md --config .markdownlint.json
+        continue-on-error: true
+
+      - name: Check links in documentation
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          use-quiet-mode: 'yes'
+          use-verbose-mode: 'yes'
+          config-file: '.markdown-link-check.json'
+
+  build-docs:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install sphinx sphinx-rtd-theme sphinx-autodoc-typehints myst-parser
+
+      - name: Install package
+        run: pip install -e .
+
+      - name: Build Sphinx documentation
+        run: |
+          cd docs/
+          sphinx-apidoc -o api/ ../src/uir/
+          sphinx-build -b html . _build/html
+
+      - name: Upload documentation artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: documentation
+          path: docs/_build/html/
+
+  api-docs:
+    name: Generate API Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install package
+        run: pip install -e .
+
+      - name: Generate OpenAPI spec
+        run: |
+          python -c "
+          from src.uir.api.main import app
+          import json
+          spec = app.openapi()
+          with open('openapi.json', 'w') as f:
+              json.dump(spec, f, indent=2)
+          "
+
+      - name: Generate Swagger UI
+        uses: Legion2/swagger-ui-action@v1
+        with:
+          output: swagger-ui
+          spec-file: openapi.json
+
+      - name: Upload API documentation
+        uses: actions/upload-artifact@v3
+        with:
+          name: api-docs
+          path: swagger-ui/
+
+  deploy-docs:
+    name: Deploy Documentation
+    runs-on: ubuntu-latest
+    needs: [build-docs, api-docs]
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Download documentation artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: documentation
+          path: docs/
+
+      - name: Download API documentation
+        uses: actions/download-artifact@v3
+        with:
+          name: api-docs
+          path: docs/api/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+
+      - name: Upload to GitHub Pages
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: docs/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
+
+  update-readme:
+    name: Update README Badges
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update badges in README
+        run: |
+          # Update build status badge
+          sed -i 's|!\[Build Status\].*|![Build Status](https://github.com/${{ github.repository }}/workflows/CI%2FCD%20Pipeline/badge.svg)|' README.md
+          
+          # Update coverage badge (this would be updated by codecov)
+          # Update version badge
+          VERSION=$(python -c "import sys; sys.path.insert(0, 'src'); import uir; print(uir.__version__)")
+          sed -i "s|!\[Version\].*|![Version](https://img.shields.io/badge/version-${VERSION}-blue)|" README.md
+
+      - name: Commit changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add README.md
+          git diff --staged --quiet || git commit -m "Update README badges [skip ci]"
+          git push

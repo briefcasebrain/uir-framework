@@ -1,0 +1,216 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: uir-system
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: uir-config
+  namespace: uir-system
+data:
+  app.conf: |
+    environment: production
+    log_level: INFO
+    cache_ttl: 3600
+    max_providers: 10
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: uir-secrets
+  namespace: uir-system
+type: Opaque
+stringData:
+  api-key: "your-api-key-here"
+  redis-url: "redis://redis-service:6379"
+  postgres-url: "postgresql://uir_user:password@postgres-service:5432/uir"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: uir-api
+  namespace: uir-system
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: uir-api
+  template:
+    metadata:
+      labels:
+        app: uir-api
+    spec:
+      containers:
+      - name: uir-api
+        image: uir-framework:latest
+        ports:
+        - containerPort: 8000
+          name: http
+        - containerPort: 9090
+          name: metrics
+        env:
+        - name: UIR_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: uir-secrets
+              key: api-key
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: uir-secrets
+              key: redis-url
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: uir-secrets
+              key: postgres-url
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+      volumes:
+      - name: config
+        configMap:
+          name: uir-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: uir-api-service
+  namespace: uir-system
+spec:
+  selector:
+    app: uir-api
+  ports:
+  - port: 80
+    targetPort: 8000
+    name: http
+  - port: 9090
+    targetPort: 9090
+    name: metrics
+  type: ClusterIP
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: uir-api-hpa
+  namespace: uir-system
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: uir-api
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: uir-system
+spec:
+  serviceName: redis-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 10Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: uir-system
+spec:
+  selector:
+    app: redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+  type: ClusterIP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: uir-ingress
+  namespace: uir-system
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+spec:
+  tls:
+  - hosts:
+    - api.uir-framework.io
+    secretName: uir-tls
+  rules:
+  - host: api.uir-framework.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: uir-api-service
+            port:
+              number: 80
