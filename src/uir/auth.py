@@ -25,6 +25,7 @@ class AuthManager:
         self.access_token_expire_minutes = access_token_expire_minutes
         self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
         self.api_keys: Dict[str, Dict[str, Any]] = {}
+        self.api_key_store: Dict[str, str] = {}  # Store raw key -> hash mapping
         self.users: Dict[str, Dict[str, Any]] = {}
         self.logger = logger.bind(component="auth")
     
@@ -40,6 +41,7 @@ class AuthManager:
         api_key = f"uir_{secrets.token_urlsafe(32)}"
         api_key_hash = self._hash_api_key(api_key)
         
+        # Store both the hash and the mapping
         self.api_keys[api_key_hash] = {
             "user_id": user_id,
             "name": name,
@@ -51,12 +53,20 @@ class AuthManager:
             "usage_count": 0
         }
         
+        # Store raw key to hash mapping for validation
+        self.api_key_store[api_key] = api_key_hash
+        
         self.logger.info(f"Created API key for user {user_id}")
         return api_key
     
     def validate_api_key(self, api_key: str) -> Optional[Dict[str, Any]]:
         """Validate API key and return associated data"""
-        api_key_hash = self._hash_api_key(api_key)
+        # Check if key exists in our store
+        if api_key not in self.api_key_store:
+            return None
+        
+        # Get the hash from our store
+        api_key_hash = self.api_key_store[api_key]
         
         if api_key_hash not in self.api_keys:
             return None
@@ -120,8 +130,8 @@ class AuthManager:
         return key_data.get("rate_limit")
     
     def _hash_api_key(self, api_key: str) -> str:
-        """Hash API key for storage"""
-        return self.pwd_context.hash(api_key)
+        """Hash API key for storage using SHA256 for consistent hashing"""
+        return hashlib.sha256(api_key.encode()).hexdigest()
     
     def create_user(
         self,
